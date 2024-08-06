@@ -151,6 +151,8 @@ abstract contract Deployer is Script {
     ///         hardhat deploy style artifacts are created.
     function sync() public {
         Deployment[] memory deployments = _getTempDeployments();
+        console.log("Deployment path %s", tempDeploymentsPath);
+
         console.log("Syncing %s deployments", deployments.length);
         console.log("Using deployment artifact %s", deployPath);
 
@@ -364,24 +366,32 @@ abstract contract Deployer is Script {
     }
 
     /// @notice Returns the json of the deployment transaction given a contract address.
-    function _getDeployTransactionByContractAddress(address _addr) internal returns (string memory) {
-        string[] memory cmd = new string[](3);
-        cmd[0] = Executables.bash;
-        cmd[1] = "-c";
-        cmd[2] = string.concat(
-            Executables.jq,
-            " -r '.transactions[] | select(.contractAddress == ",
-            '"',
-            vm.toString(_addr),
-            '"',
-            ') | select(.transactionType == "CREATE"',
-            ' or .transactionType == "CREATE2"',
-            ")' < ",
-            deployPath
-        );
-        bytes memory res = vm.ffi(cmd);
-        return string(res);
-    }
+function _getDeployTransactionByContractAddress(address _addr) internal returns (string memory) {
+    // Convert address to lowercase
+    string memory addressStr = vm.toString(_addr);
+    string memory lowerAddressStr = LibString.lower(addressStr);
+    console.log("Fetching transaction for address: %s", lowerAddressStr);
+
+    string[] memory cmd = new string[](3);
+    cmd[0] = Executables.bash;
+    cmd[1] = "-c";
+    cmd[2] = string.concat(
+        Executables.jq,
+        " -r '.transactions[] | select(.contractAddress | ascii_downcase == ",
+        '"',
+        lowerAddressStr,
+        '"',
+        ') | select(.transactionType == "CREATE"',
+        ' or .transactionType == "CREATE2"',
+        ")' < ",
+        deployPath
+    );
+
+    bytes memory res = vm.ffi(cmd);
+    string memory result = string(res);
+
+    return result;
+}
 
     /// @notice Returns the contract name from a deploy transaction.
     function _getContractNameFromDeployTransaction(string memory _deployTx) internal pure returns (string memory) {
@@ -478,6 +488,9 @@ abstract contract Deployer is Script {
 
     /// @notice Returns the receipt of a deployment transaction.
     function _getDeployReceiptByContractAddress(address _addr) internal returns (string memory receipt_) {
+        string memory addressStr = vm.toString(_addr);
+        string memory lowerAddressStr = LibString.lower(addressStr);
+
         string[] memory cmd = new string[](3);
         cmd[0] = Executables.bash;
         cmd[1] = "-c";
@@ -485,7 +498,7 @@ abstract contract Deployer is Script {
             Executables.jq,
             " -r '.receipts[] | select(.contractAddress == ",
             '"',
-            vm.toString(_addr),
+            lowerAddressStr,
             '"',
             ")' < ",
             deployPath
